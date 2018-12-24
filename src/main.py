@@ -1,3 +1,2 @@
-from data_parser import generate_data
-import model
-def
+from src.data_parser import DataParser
+from src.model import deep_wide_model
