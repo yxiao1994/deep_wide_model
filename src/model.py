@@ -1,10 +1,11 @@
 import tensorflow as tf
 import numpy as np
+from sklearn.metrics import log_loss
 
 
 class deep_wide_model(object):
     def __init__(self, feature_size, field_size, embedding_dim, dropout_rate, batch_size, loss_type='logloss',
-                 deep_layers=[64, 32], activation=tf.nn.relu, epoch=5, learning_rate=0.001):
+                 deep_layers=[64, 32], activation=tf.nn.relu, epoch=5, learning_rate=0.001, verbose=2):
         self.feature_size = feature_size  # denoted as N, feature size after one-hot encoding
         self.field_size = field_size  # denoted as F, feature size before one-hot encoding
         self.embedding_size = embedding_dim  # denoted as K, embedding size
@@ -14,6 +15,7 @@ class deep_wide_model(object):
         self.deep_layers = deep_layers
         self.activation = activation
         self.epoch = epoch
+        self.verbose = verbose
         self.learning_rate = learning_rate
         self.train_result, self.valid_result = [], []
         self._init_graph()
@@ -24,7 +26,7 @@ class deep_wide_model(object):
         weights['wide'] = tf.Variable(tf.truncated_normal([self.feature_size, 1], 0, 0.01),
                                       name='lr_weights')
         # deep部分权重，N * K
-        weights['deep'] = tf.Variable(tf.truncated_normal([self.feature_size, 1], 0, 0.01),
+        weights['deep'] = tf.Variable(tf.truncated_normal([self.feature_size, self.embedding_size], 0, 0.01),
                                       name='embedding_weights')
 
         # 全连接层的权重
@@ -64,20 +66,23 @@ class deep_wide_model(object):
             self.train_phase = tf.placeholder(tf.bool, name='train_phase')
 
             self.lr = tf.nn.embedding_lookup(self.weights['wide'], self.feature_index)  # None * F * 1
-
+            print(self.lr.shape)
             # self.lr = tf.squeeze(self.lr)  # None * F
             self.lr = tf.reduce_sum(self.lr, axis=2)  # None * F
+            print(self.lr.shape)
             self.lr = self.lr * self.feature_value  # None * F
+            print(self.lr.shape)
 
             self.deep = tf.nn.embedding_lookup(self.weights['deep'], self.feature_index)  # None * F * K
             self.deep = tf.reshape(self.deep, [-1, self.embedding_size * self.field_size])  # None * (F * K)
-            # print(self.deep.shape)
+            print(self.deep.shape)
             for i in range(len(self.deep_layers)):
                 self.deep = tf.add(tf.matmul(self.deep, self.weights['deep_layer_weights_%d' % i]),
                                    self.weights['deep_layer_biase_%d' % i])
                 self.deep = self.activation(self.deep)
                 self.deep = tf.nn.dropout(self.deep, self.dropout_rate)
             self.out = tf.concat([self.deep, self.lr], axis=1)
+            print(self.out.shape)
             self.out = tf.add(tf.matmul(self.out, self.weights['concat_projection']),
                               self.weights['concat_biase'])
 
@@ -92,12 +97,10 @@ class deep_wide_model(object):
             tf.global_variables_initializer().run()
 
     def get_batch_data(self, Xi, Xv, label, index):
-        if len(label.shape) == 1:
-            label = np.reshape(label, [label.shape[0], 1])
         start = index * self.batch_size
         end = (index + 1) * self.batch_size
         end = end if end < len(label) else len(label)
-        return Xi[start:end], Xv[start:end], label[start, end]
+        return Xi[start:end], Xv[start:end], label[start:end]
 
     def shuffle_data(self, Xi, Xv, label):
         data_size = len(label)
@@ -105,9 +108,9 @@ class deep_wide_model(object):
         return Xi[shuffle_indices], Xv[shuffle_indices], label[shuffle_indices]
 
     def fit_batch_data(self, Xi, Xv, y):
-        feed_dict = {self.feat_index: Xi,
-                     self.feat_value: Xv,
-                     self.label: y,
+        feed_dict = {self.feature_index: Xi,
+                     self.feature_value: Xv,
+                     self.y: y,
                      self.train_phase: True}
         loss, _ = self.sess.run([self.loss, self.optimizer], feed_dict=feed_dict)
         return loss
@@ -115,10 +118,15 @@ class deep_wide_model(object):
     def fit(self, Xi_train, Xv_tain, y_train, Xi_valid=None, Xv_valid=None, y_valid=None):
         has_valid = (Xi_valid is not None)
         total_batch = int(len(y_train) / self.batch_size)
-        for epoch in self.epoch:
+        for epoch in range(self.epoch):
+            print('epoch {}'.format(epoch))
             Xi_train, Xv_tain, y_train = self.shuffle_data(Xi_train, Xv_tain, y_train)
-            for batch_index in total_batch:
+            for batch_index in range(total_batch):
+                print('batch index: '.format(batch_index))
                 Xi_batch, Xv_batch, y_batch = self.get_batch_data(Xi_train, Xv_tain, y_train, batch_index)
+                print(Xi_batch.shape)
+                print(Xv_batch.shape)
+                print(y_train.shape)
                 self.fit_batch_data(Xi_batch, Xv_batch, y_batch)
 
             train_result = self.evaluate(Xi_train, Xv_tain, y_train)
@@ -128,28 +136,30 @@ class deep_wide_model(object):
                 self.valid_result.append(valid_result)
             if self.verbose > 0 and epoch % self.verbose == 0:
                 if has_valid:
-                    print("[%d] train-result=%.4f, valid-result=%.4f [%.1f s]"
+                    print("[%d] train-result=%.4f, valid-result=%.4f"
                           % (epoch + 1, train_result, valid_result))
                 else:
                     print("[%d] train-result=%.4f "
                           % (epoch + 1, train_result))
 
     def predict(self, Xi_test, Xv_test):
-        total_batch = len(Xi_test) / self.batch_size
+        total_batch = int(len(Xi_test) / self.batch_size)
         y_predict = np.array([])
-        y_dummy = [1] * len(Xi_test)
+        y_dummy = np.zeros((len(Xi_test), 1))
         for batch_index in range(total_batch + 1):
             Xi_batch, Xv_batch, y_batch = self.get_batch_data(Xi_test, Xv_test, y_dummy, batch_index)
-            feed_dict = {self.feat_index: Xi_batch,
-                         self.feat_value: Xv_batch,
+            feed_dict = {self.feature_index: Xi_batch,
+                         self.feature_value: Xv_batch,
                          self.y: y_batch,
                          self.train_phase: False
                          }
             batch_res = self.sess.run(self.out, feed_dict=feed_dict)
             y_predict = np.concatenate([y_predict, batch_res.reshape(-1, )])
+            print('predict shape: {}'.format(y_predict.shape))
 
         return y_predict
 
     def evaluate(self, Xi, Xv, y_true):
+        y_true = y_true.reshape((-1,))
         y_predict = self.predict(Xi, Xv)
-        return tf.losses.log_loss(y_true, y_predict)
+        return log_loss(y_true, y_predict)
