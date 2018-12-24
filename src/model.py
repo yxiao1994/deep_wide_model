@@ -120,9 +120,6 @@ class deep_wide_model(object):
             for batch_index in range(total_batch):
                 # print('batch index: '.format(batch_index))
                 Xi_batch, Xv_batch, y_batch = self.get_batch_data(Xi_train, Xv_tain, y_train, batch_index)
-                # print(Xi_batch.shape)
-                # print(Xv_batch.shape)
-                # print(y_train.shape)
                 self.fit_batch_data(Xi_batch, Xv_batch, y_batch)
 
             train_result = self.evaluate(Xi_train, Xv_tain, y_train)
