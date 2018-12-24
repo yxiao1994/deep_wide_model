@@ -66,23 +66,23 @@ class deep_wide_model(object):
             self.train_phase = tf.placeholder(tf.bool, name='train_phase')
 
             self.lr = tf.nn.embedding_lookup(self.weights['wide'], self.feature_index)  # None * F * 1
-            print(self.lr.shape)
+            # print(self.lr.shape)
             # self.lr = tf.squeeze(self.lr)  # None * F
             self.lr = tf.reduce_sum(self.lr, axis=2)  # None * F
-            print(self.lr.shape)
+            # print(self.lr.shape)
             self.lr = self.lr * self.feature_value  # None * F
-            print(self.lr.shape)
+            # print(self.lr.shape)
 
             self.deep = tf.nn.embedding_lookup(self.weights['deep'], self.feature_index)  # None * F * K
             self.deep = tf.reshape(self.deep, [-1, self.embedding_size * self.field_size])  # None * (F * K)
-            print(self.deep.shape)
+            # print(self.deep.shape)
             for i in range(len(self.deep_layers)):
                 self.deep = tf.add(tf.matmul(self.deep, self.weights['deep_layer_weights_%d' % i]),
                                    self.weights['deep_layer_biase_%d' % i])
                 self.deep = self.activation(self.deep)
                 self.deep = tf.nn.dropout(self.deep, self.dropout_rate)
             self.out = tf.concat([self.deep, self.lr], axis=1)
-            print(self.out.shape)
+            # print(self.out.shape)
             self.out = tf.add(tf.matmul(self.out, self.weights['concat_projection']),
                               self.weights['concat_biase'])
 
@@ -122,11 +122,11 @@ class deep_wide_model(object):
             print('epoch {}'.format(epoch))
             Xi_train, Xv_tain, y_train = self.shuffle_data(Xi_train, Xv_tain, y_train)
             for batch_index in range(total_batch):
-                print('batch index: '.format(batch_index))
+                # print('batch index: '.format(batch_index))
                 Xi_batch, Xv_batch, y_batch = self.get_batch_data(Xi_train, Xv_tain, y_train, batch_index)
-                print(Xi_batch.shape)
-                print(Xv_batch.shape)
-                print(y_train.shape)
+                # print(Xi_batch.shape)
+                # print(Xv_batch.shape)
+                # print(y_train.shape)
                 self.fit_batch_data(Xi_batch, Xv_batch, y_batch)
 
             train_result = self.evaluate(Xi_train, Xv_tain, y_train)
@@ -155,7 +155,7 @@ class deep_wide_model(object):
                          }
             batch_res = self.sess.run(self.out, feed_dict=feed_dict)
             y_predict = np.concatenate([y_predict, batch_res.reshape(-1, )])
-            print('predict shape: {}'.format(y_predict.shape))
+            # print('predict shape: {}'.format(y_predict.shape))
 
         return y_predict
 
