@@ -121,19 +121,19 @@ class deep_wide_model(object):
                 # print('batch index: '.format(batch_index))
                 Xi_batch, Xv_batch, y_batch = self.get_batch_data(Xi_train, Xv_tain, y_train, batch_index)
                 self.fit_batch_data(Xi_batch, Xv_batch, y_batch)
-
-            train_result = self.evaluate(Xi_train, Xv_tain, y_train)
-            self.train_result.append(train_result)
-            if has_valid:
-                valid_result = self.evaluate(Xi_valid, Xv_valid, y_valid)
-                self.valid_result.append(valid_result)
-            if self.verbose > 0 and epoch % self.verbose == 0:
-                if has_valid:
-                    print("[%d] train-result=%.4f, valid-result=%.4f"
-                          % (epoch + 1, train_result, valid_result))
-                else:
-                    print("[%d] train-result=%.4f "
-                          % (epoch + 1, train_result))
+                if batch_index % 50 == 0:
+                    train_result = self.evaluate(Xi_train, Xv_tain, y_train)
+                    self.train_result.append(train_result)
+                    if has_valid:
+                        valid_result = self.evaluate(Xi_valid, Xv_valid, y_valid)
+                        self.valid_result.append(valid_result)
+                    if self.verbose > 0 and epoch % self.verbose == 0:
+                        if has_valid:
+                            print("[%d] train-result=%.4f, valid-result=%.4f"
+                                  % (epoch + 1, train_result, valid_result))
+                        else:
+                            print("[%d] train-result=%.4f "
+                                  % (epoch + 1, train_result))
 
     def predict(self, Xi_test, Xv_test):
         total_batch = int(len(Xi_test) / self.batch_size)
