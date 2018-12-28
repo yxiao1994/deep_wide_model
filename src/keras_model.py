@@ -3,6 +3,57 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.models import Model
 from keras.layers import *
 from keras.layers.embeddings import Embedding
+from keras import backend as K
+import tensorflow as tf
+from keras.initializers import RandomNormal
+from keras.regularizers import l2
+
+
+class FM(Layer):
+    """Factorization Machine models pairwise (order-2) feature interactions
+     without linear term and bias.
+
+      Input shape
+        - 3D tensor with shape: ``(batch_size,field_size,embedding_size)``.
+
+      Output shape
+        - 2D tensor with shape: ``(batch_size, 1)``.
+
+      References
+        - [Factorization Machines](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)
+    """
+
+    def __init__(self, **kwargs):
+
+        super(FM, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        if len(input_shape) != 3:
+            raise ValueError("Unexpected inputs dimensions % d,\
+                             expect to be 3 dimensions" % (len(input_shape)))
+
+        super(FM, self).build(input_shape)  # Be sure to call this somewhere!
+
+    def call(self, inputs, **kwargs):
+
+        if K.ndim(inputs) != 3:
+            raise ValueError(
+                "Unexpected inputs dimensions %d, expect to be 3 dimensions"
+                % (K.ndim(inputs)))
+
+        concated_embeds_value = inputs
+
+        square_of_sum = tf.square(tf.reduce_sum(
+            concated_embeds_value, axis=1, keep_dims=True))
+        sum_of_square = tf.reduce_sum(
+            concated_embeds_value * concated_embeds_value, axis=1, keep_dims=True)
+        cross_term = square_of_sum - sum_of_square
+        cross_term = 0.5 * tf.reduce_sum(cross_term, axis=2, keep_dims=False)
+
+        return cross_term
+
+    def compute_output_shape(self, input_shape):
+        return (None, 1)
 
 
 class Deep_Wide_Model(object):
@@ -31,9 +82,15 @@ class Deep_Wide_Model(object):
         return sparse_input, dense_input
 
     def _get_embedding(self):
-        sparse_embedding = [Embedding(self.sparse_feature_dim_dict[feature], self.embedding_size) for feature
+        sparse_embedding = [Embedding(self.sparse_feature_dim_dict[feature], self.embedding_size,
+                                      embeddings_initializer=RandomNormal(
+                                          mean=0.0, stddev=0.0001),
+                                      embeddings_regularizer=l2(0.00001),
+                                      ) for feature
                             in self.sparse_feature_dim_dict]
-        linear_embedding = [Embedding(self.sparse_feature_dim_dict[feature], 1) for feature
+        linear_embedding = [Embedding(self.sparse_feature_dim_dict[feature], 1, embeddings_initializer=RandomNormal(
+                                          mean=0.0, stddev=0.0001),
+                                      embeddings_regularizer=l2(0.00001),) for feature
                             in self.sparse_feature_dim_dict]
         return sparse_embedding, linear_embedding
 
@@ -43,17 +100,20 @@ class Deep_Wide_Model(object):
 
         embed_list = [sparse_embedding[i](sparse_input[i])
                       for i in range(len(sparse_input))]
-        deep_part = Concatenate(axis=1)(embed_list)  # None * K * F
-        deep_part = Flatten()(deep_part)  # None * (K * F)
+        deep_part = Concatenate(axis=1)(embed_list)  # None * F * K
+        deep_part = Flatten()(deep_part)  # None * (F * K)
 
         if len(dense_input) > 0:
             deep_part = Concatenate()([deep_part] + dense_input)
-        deep_part = Dense(32)(deep_part)  # None * 32
-        deep_part = Dense(16)(deep_part)  # None * 16
+        deep_part = Dense(32, activation='relu')(deep_part)  # None * 32
+        deep_part = Dense(16, activation='relu')(deep_part)  # None * 16
 
         bias_embed_list = [linear_embedding[i](sparse_input[i])
                            for i in range(len(self.sparse_feature_dim_dict))]
         wide_part = Flatten()(Add()(bias_embed_list))  # None * 1
+
+        print(deep_part.shape)
+        print(wide_part.shape)
 
         merged = Concatenate()([wide_part, deep_part])
 
@@ -62,8 +122,51 @@ class Deep_Wide_Model(object):
         model.compile(loss='binary_crossentropy', optimizer='adam')
         return model
 
-    def fit(self):
-        model = self.model()
+    def fm_model(self):
+        sparse_input, dense_input = self._get_input()
+        sparse_embedding, linear_embedding = self._get_embedding()
+
+        embed_list = [sparse_embedding[i](sparse_input[i])
+                      for i in range(len(sparse_input))]
+
+        bias_embed_list = [linear_embedding[i](sparse_input[i])
+                           for i in range(len(sparse_input))]
+        wide_part = Flatten()(Add()(bias_embed_list))  # None * 1
+
+        if len(dense_input) > 0:
+            continuous_embedding_list = [Dense(self.embedding_size)(x) for x in dense_input]
+            continuous_embedding_list = [Reshape((1, self.embedding_size))(x) for x in continuous_embedding_list]
+            embed_list += continuous_embedding_list
+            dense_part = dense_input[0] if len(dense_input) == 1 else Concatenate()(dense_input)
+            dense_part = Dense(1, activation=None, use_bias=False)(dense_part)
+            wide_part = Add()([wide_part, dense_part])  # None * 1  # None * 1
+
+        fm_input = Concatenate(axis=1)(embed_list)  # None * F * K
+        fm_part = FM()(fm_input)
+
+        deep_part = Concatenate(axis=1)(embed_list)  # None * F * K
+        deep_part = Flatten()(deep_part)  # None * (F * K)
+        deep_part = Dense(128, activation='relu')(deep_part)  # None * 32
+        deep_part = Dense(128, activation='relu')(deep_part)  # None * 32
+        deep_part = Dense(1)(deep_part)  # None * 1
+
+        print(deep_part.shape)
+        print(wide_part.shape)
+
+        merged = Concatenate()([deep_part, wide_part, fm_part])
+        print(merged.shape)
+        output = Dense(1, activation="sigmoid")(merged)
+        model = Model(inputs=sparse_input + dense_input, outputs=output)
+        model.compile(loss='binary_crossentropy', optimizer='adam')
+        return model
+
+    def fit(self, model_name):
+        if model_name == 'deep_wide_model':
+            model = self.model()
+        elif model_name == 'deep_fm_model':
+            model = self.fm_model()
+        else:
+            print('please choose the right model!')
         print(model.summary())
         early_stopping = EarlyStopping(monitor="val_loss", patience=3)
         best_model_path = "deep_wide_model" + ".h5"
