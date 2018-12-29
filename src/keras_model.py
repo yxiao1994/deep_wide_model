@@ -94,7 +94,7 @@ class Deep_Wide_Model(object):
                             in self.sparse_feature_dim_dict]
         return sparse_embedding, linear_embedding
 
-    def model(self):
+    def deep_wide_model(self):
         sparse_input, dense_input = self._get_input()
         sparse_embedding, linear_embedding = self._get_embedding()
 
@@ -122,7 +122,7 @@ class Deep_Wide_Model(object):
         model.compile(loss='binary_crossentropy', optimizer='adam')
         return model
 
-    def fm_model(self):
+    def deep_fm_model(self):
         sparse_input, dense_input = self._get_input()
         sparse_embedding, linear_embedding = self._get_embedding()
 
@@ -157,9 +157,9 @@ class Deep_Wide_Model(object):
 
     def fit(self, model_name):
         if model_name == 'deep_wide_model':
-            model = self.model()
+            model = self.deep_wide_model()
         elif model_name == 'deep_fm_model':
-            model = self.fm_model()
+            model = self.deep_fm_model()
         else:
             print('please choose the right model!')
         print(model.summary())
