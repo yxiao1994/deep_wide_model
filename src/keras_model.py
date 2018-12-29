@@ -149,11 +149,7 @@ class Deep_Wide_Model(object):
         deep_part = Dense(128, activation='relu')(deep_part)  # None * 32
         deep_part = Dense(1)(deep_part)  # None * 1
 
-        print(deep_part.shape)
-        print(wide_part.shape)
-
         merged = Concatenate()([deep_part, wide_part, fm_part])
-        print(merged.shape)
         output = Dense(1, activation="sigmoid")(merged)
         model = Model(inputs=sparse_input + dense_input, outputs=output)
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['binary_crossentropy'], )
