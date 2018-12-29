@@ -139,13 +139,12 @@ class Deep_Wide_Model(object):
             embed_list += continuous_embedding_list
             dense_part = dense_input[0] if len(dense_input) == 1 else Concatenate()(dense_input)
             dense_part = Dense(1, activation=None, use_bias=False)(dense_part)
-            wide_part = Add()([wide_part, dense_part])  # None * 1  # None * 1
+            wide_part = Add()([wide_part, dense_part])  # None * 1
 
         fm_input = Concatenate(axis=1)(embed_list)  # None * F * K
         fm_part = FM()(fm_input)
 
-        deep_part = Concatenate(axis=1)(embed_list)  # None * F * K
-        deep_part = Flatten()(deep_part)  # None * (F * K)
+        deep_part = Flatten()(fm_input)  # None * (F * K)
         deep_part = Dense(128, activation='relu')(deep_part)  # None * 32
         deep_part = Dense(128, activation='relu')(deep_part)  # None * 32
         deep_part = Dense(1)(deep_part)  # None * 1
