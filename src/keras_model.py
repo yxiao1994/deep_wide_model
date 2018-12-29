@@ -88,9 +88,9 @@ class Deep_Wide_Model(object):
                                       embeddings_regularizer=l2(0.00001),
                                       ) for feature
                             in self.sparse_feature_dim_dict]
-        linear_embedding = [Embedding(self.sparse_feature_dim_dict[feature], 1, embeddings_initializer=RandomNormal(
-                                          mean=0.0, stddev=0.0001),
-                                      embeddings_regularizer=l2(0.00001),) for feature
+        linear_embedding = [Embedding(self.sparse_feature_dim_dict[feature], 1,
+                                      embeddings_initializer=RandomNormal(mean=0.0, stddev=0.0001),
+                                      embeddings_regularizer=l2(0.00001), ) for feature
                             in self.sparse_feature_dim_dict]
         return sparse_embedding, linear_embedding
 
@@ -130,7 +130,7 @@ class Deep_Wide_Model(object):
                       for i in range(len(sparse_input))]
 
         bias_embed_list = [linear_embedding[i](sparse_input[i])
-                           for i in range(len(sparse_input))]
+                           for i in range(len(self.sparse_feature_dim_dict))]
         wide_part = Flatten()(Add()(bias_embed_list))  # None * 1
 
         if len(dense_input) > 0:
@@ -157,7 +157,7 @@ class Deep_Wide_Model(object):
         print(merged.shape)
         output = Dense(1, activation="sigmoid")(merged)
         model = Model(inputs=sparse_input + dense_input, outputs=output)
-        model.compile(loss='binary_crossentropy', optimizer='adam')
+        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['binary_crossentropy'], )
         return model
 
     def fit(self, model_name):
@@ -175,7 +175,7 @@ class Deep_Wide_Model(object):
         input2 = [self.train_data[feat].values for feat in self.dense_feature_list]
 
         hist = model.fit(input1 + input2, self.train_data['label'].values, validation_split=0.2,
-                         epochs=5, batch_size=self.batch_size, shuffle=True,
+                         epochs=15, batch_size=self.batch_size, shuffle=True,
                          callbacks=[early_stopping, model_checkpoint],
                          verbose=1)
         model.load_weights(best_model_path)
