@@ -72,8 +72,7 @@ class CrossNet(Layer):
 
     def call(self, inputs):
         if K.ndim(inputs) != 2:
-            raise ValueError(
-                "Unexpected inputs dimensions %d, expect to be 2 dimensions" % (K.ndim(inputs)))
+            raise ValueError("Unexpected inputs dimensions %d, expect to be 2 dimensions" % (K.ndim(inputs)))
         x_0 = tf.expand_dims(inputs, axis=-1)  # None * k * 1
         x_l = x_0
         for i in range(self.num_layers):
