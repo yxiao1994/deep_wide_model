@@ -81,6 +81,7 @@ class CrossNet(Layer):
             temp = tf.matmul(x_0, self.kernels[i])  # x0 * xl * w, None * k * 1
             x_l = temp + x_l + self.bias[i]
         x_l = tf.squeeze(x_l)
+        return x_l
 
     def compute_output_shape(self, input_shape):
         return input_shape
