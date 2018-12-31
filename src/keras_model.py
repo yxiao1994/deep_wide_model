@@ -139,7 +139,7 @@ class Deep_Wide_Model(object):
         elif model_name == 'dcn_model':
             model = self.dcn_model()
         else:
-            print('please choose the right model!')
+            print('please choose the right model! ')
         print(model.summary())
         early_stopping = EarlyStopping(monitor="val_loss", patience=3)
         best_model_path = "deep_wide_model" + ".h5"
