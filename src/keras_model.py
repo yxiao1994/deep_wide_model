@@ -3,57 +3,9 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping
 from keras.models import Model
 from keras.layers import *
 from keras.layers.embeddings import Embedding
-from keras import backend as K
-import tensorflow as tf
 from keras.initializers import RandomNormal
 from keras.regularizers import l2
-
-
-class FM(Layer):
-    """Factorization Machine models pairwise (order-2) feature interactions
-     without linear term and bias.
-
-      Input shape
-        - 3D tensor with shape: ``(batch_size,field_size,embedding_size)``.
-
-      Output shape
-        - 2D tensor with shape: ``(batch_size, 1)``.
-
-      References
-        - [Factorization Machines](https://www.csie.ntu.edu.tw/~b97053/paper/Rendle2010FM.pdf)
-    """
-
-    def __init__(self, **kwargs):
-
-        super(FM, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        if len(input_shape) != 3:
-            raise ValueError("Unexpected inputs dimensions % d,\
-                             expect to be 3 dimensions" % (len(input_shape)))
-
-        super(FM, self).build(input_shape)  # Be sure to call this somewhere!
-
-    def call(self, inputs, **kwargs):
-
-        if K.ndim(inputs) != 3:
-            raise ValueError(
-                "Unexpected inputs dimensions %d, expect to be 3 dimensions"
-                % (K.ndim(inputs)))
-
-        concated_embeds_value = inputs
-
-        square_of_sum = tf.square(tf.reduce_sum(
-            concated_embeds_value, axis=1, keep_dims=True))
-        sum_of_square = tf.reduce_sum(
-            concated_embeds_value * concated_embeds_value, axis=1, keep_dims=True)
-        cross_term = square_of_sum - sum_of_square
-        cross_term = 0.5 * tf.reduce_sum(cross_term, axis=2, keep_dims=False)
-
-        return cross_term
-
-    def compute_output_shape(self, input_shape):
-        return (None, 1)
+from src.layers import FM, CrossNet
 
 
 class Deep_Wide_Model(object):
@@ -150,6 +102,30 @@ class Deep_Wide_Model(object):
         deep_part = Dense(1)(deep_part)  # None * 1
 
         merged = Concatenate()([deep_part, wide_part, fm_part])
+        output = Dense(1, activation="sigmoid")(merged)
+        model = Model(inputs=sparse_input + dense_input, outputs=output)
+        model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['binary_crossentropy'], )
+        return model
+
+    def dcn_model(self):
+        sparse_input, dense_input = self._get_input()
+        sparse_embedding, linear_embedding = self._get_embedding()
+
+        embed_list = [sparse_embedding[i](sparse_input[i])
+                      for i in range(len(sparse_input))]
+        deep_input = Flatten()(Concatenate()(embed_list))  # None * (F * K)
+        if len(dense_input) > 0:
+            if len(dense_input) == 1:
+                continuous_list = dense_input[0]
+            else:
+                continuous_list = Concatenate()(dense_input)
+
+            deep_input = Concatenate()([deep_input, continuous_list])
+
+        cross_part = CrossNet()(deep_input)
+        deep_part = Dense(128, activation='relu')(deep_input)
+        deep_part = Dense(32, activation='relu')(deep_input)
+        merged = Concatenate()([cross_part, deep_part])
         output = Dense(1, activation="sigmoid")(merged)
         model = Model(inputs=sparse_input + dense_input, outputs=output)
         model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['binary_crossentropy'], )
