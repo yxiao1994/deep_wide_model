@@ -136,6 +136,8 @@ class Deep_Wide_Model(object):
             model = self.deep_wide_model()
         elif model_name == 'deep_fm_model':
             model = self.deep_fm_model()
+        elif model_name == 'dcn_model':
+            model = self.dcn_model()
         else:
             print('please choose the right model!')
         print(model.summary())
