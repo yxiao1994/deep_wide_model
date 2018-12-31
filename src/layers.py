@@ -77,9 +77,8 @@ class CrossNet(Layer):
         x_0 = tf.expand_dims(inputs, axis=-1)  # None * k * 1
         x_l = x_0
         for i in range(self.num_layers):
-            temp = tf.matmul(tf.transpose(x_0, [0, 2, 1]), x_l)  # x0 * xl, None * 1 * 1
-            temp = tf.tensordot(temp, self.kernels[i], axes=(-1, -1))  # x0 * xl * w, None * 1 * k
-            temp = tf.transpose(temp, [0, 2, 1])  # x0 * xl * w, None * k * 1
+            temp = tf.tensordot(x_l, self.kernels[i], axes=(1, 0))  # xl * w, None * 1 * 1
+            temp = tf.matmul(x_0, self.kernels[i])  # x0 * xl * w, None * k * 1
             x_l = temp + x_l + self.bias[i]
         x_l = tf.squeeze(x_l)
 
