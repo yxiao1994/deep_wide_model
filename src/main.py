@@ -23,8 +23,10 @@ if __name__ == '__main__':
 
     sparse_feature_dict = {feat: data[feat].nunique() for feat in sparse_features}
     dense_feature_list = dense_features
+    model_input = [data[feat].values for feat in sparse_feature_dict] + [data[feat].values for feat in
+                                                                         dense_feature_list]
 
-    model = Deep_Wide_Model(data, sparse_feature_dict, dense_feature_list, 8, 0.001, 32)
+    model = Deep_Wide_Model(model_input, sparse_feature_dict, dense_feature_list, 8, 0.001, 32)
 
 
 
