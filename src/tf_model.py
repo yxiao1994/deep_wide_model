@@ -29,6 +29,7 @@ class deep_wide_model(object):
         weights['deep'] = tf.Variable(
             tf.truncated_normal([self.feature_size, self.embedding_size], mean=0, stddev=0.0001),
             name='embedding_weights')
+
         # 全连接层的权重
         num_layers = len(self.deep_layers)
         input_size = self.field_size * self.embedding_size
