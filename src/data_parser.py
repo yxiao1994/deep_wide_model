@@ -8,9 +8,9 @@ class DataParser(object):
         self.target = self.df_train.pop(target_name).values
         self.numeric_columns = numeric_columns
         self.ignore_columns = ignore_columns
-        self.gen_feature_index()
+        self._gen_feature_index()
 
-    def gen_feature_index(self):
+    def _gen_feature_index(self):
         df_train = self.df_train
         df_test = self.df_test
 
@@ -37,7 +37,7 @@ class DataParser(object):
         self.df_train = df_train
         self.df_test = df_test
 
-    def parser_data(self, data):
+    def _parser_data(self, data):
         dfi = data.copy()
         dfv = dfi.copy()
         for col in dfi.columns:
@@ -53,6 +53,6 @@ class DataParser(object):
         return dfi, dfv
 
     def generate_data(self):
-        dfi_train, dfv_train = self.parser_data(self.df_train)
-        dfi_test, dfv_test = self.parser_data(self.df_test)
+        dfi_train, dfv_train = self._parser_data(self.df_train)
+        dfi_test, dfv_test = self._parser_data(self.df_test)
         return dfi_train, dfv_train, dfi_test, dfv_test, self.feature_dim, self.target
